@@ -24,6 +24,12 @@ type JoinRequest struct {
     PublicKey string `json:"public_key"`
 }
 
+//type peerDetail struct {
+//    PublicKey  string `json:"public_key"`
+//    AllowedIPs string `json:"allowed_ip"`
+//}
+
+
 type JoinResponse struct {
     AssignedIP      string          `json:"assigned_ip"`
     ServerPublicKey string          `json:"server_public_key"`

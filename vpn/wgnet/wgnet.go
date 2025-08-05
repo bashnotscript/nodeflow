@@ -59,13 +59,7 @@ func createInterface(wgClient *wgctrl.Client, ifaceName string, cidr *net.IPNet,
     }
     if err := netlink.AddrAdd(link, addr); err != nil {
         return wgtypes.Key{}, fmt.Errorf("failed to assign address: %w", err)
-    }
-
-    // 3. Bring interface up
-    if err := netlink.LinkSetUp(link); err != nil {
-        return wgtypes.Key{}, fmt.Errorf("failed to set interface up: %w", err)
-    }
-
+    } 
     // 4. Configure device with private key and port
     config := wgtypes.Config{
         PrivateKey:   &privateKey,
@@ -76,7 +70,12 @@ func createInterface(wgClient *wgctrl.Client, ifaceName string, cidr *net.IPNet,
     if err := wgClient.ConfigureDevice(ifaceName, config); err != nil {
         return wgtypes.Key{}, fmt.Errorf("failed to configure wireguard device: %w", err)
     }
-
+	
+	// 5. Bring interface up
+   // if err:= netlink.LinkSetUp(link); err != nil {
+		 //   netlink.LinkDel(link)	
+       // return wgtypes.Key{}, fmt.Errorf("failed to set interface up: %w", err)
+    //}
     // 5. Persist to <iface>.conf (in the format LoadFromFile expects)
     var conf strings.Builder
     conf.WriteString("[Interface]\n")

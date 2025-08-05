@@ -73,11 +73,35 @@ func JoinHandler(cfg config.Config) http.HandlerFunc {
             http.Error(w, "Failed to add peer", http.StatusInternalServerError)
             return
         }
+		    
+		            // Refresh device to get updated peers
+        device, err = wgClient.Device(cfg.IfaceName)
+        if err != nil {
+            http.Error(w, "Failed to refresh WG device", http.StatusInternalServerError)
+            return
+        }
+
+        // Prepare peer list for response
+        //peers := config.peerDetails{}
+        //for _, p := range device.Peers {
+          //  for _, allowedIP := range p.AllowedIPs {
+            //    peers = append(peers, peerDetail{
+              //      PublicKey:  p.PublicKey.String(),
+                //    AllowedIPs: allowedIP.String(),
+               // })
+           // }
+       // }
+
+        resp := config.JoinResponse{
+            AssignedIP:      nextIP.String(),
+            ServerPublicKey: device.PublicKey.String(),
+            Peers:           device.Peers,
+        }
 
         w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(map[string]string{
-            "ip": nextIP.String(),
-        })
+        json.NewEncoder(w).Encode(resp)
+	
+
     }
 }
 
