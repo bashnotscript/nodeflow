@@ -7,10 +7,10 @@ import (
     "net"
     "os"
     "strings"
-    "myvpn/internal/config"
+    "nodeflow/vpn/config"
 )
 
-func findNextIP(cfg config.Config) (net.IPNet, error) {
+func FindNextIP(cfg config.Config) (net.IPNet, error) {
     confPath := fmt.Sprintf("/etc/wireguard/%s.conf", cfg.Interface)
     f, err := os.Open(confPath)
     if err != nil {
