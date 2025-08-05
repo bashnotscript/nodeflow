@@ -10,22 +10,14 @@ Nodeflow is a self-hosted peer-to-peer VPN coordination tool built on WireGuard,
 - No external persistence — interface state read directly from kernel
 - Modular design: server and agent with shared networking logic
 
-## Folder Structure
-
-```go
-Nodeflow/
-├── cmd/
-│   ├── server/        # Starts the server to handle peer joins and interface creation
-│   └── agent/         # CLI tool to join a remote tunnel securely
-├── internal/
-│   ├── wgnet/         # Kernel interface creation, configuration, and inspection via Netlink
-│   ├── server/        # IP allocation, token verification, and peer registration logic
-│   └── agent/         # Handles peer join requests, constructs peer configs, and applies interface changes
-├── go.mod
-├── go.sum
-└── README.md
-
-```
+## Server Prerequisites
+Linux OS (Ubuntu, Debian, CentOS, or similar) — The server is expected to run on a Linux system with root privileges.
+WireGuard kernel module installed and loaded
+Go runtime (if building from source) — version 1.18 or newer
+Root privileges to create network interfaces and assign IPs.
+Chmod 0600 permissions to the /etc/wireguard folder
+Ensure port 51820/UDP (or your configured port) is open in your firewall.
+The server will create and manage a WireGuard interface (default wg0).
 
 ## Quick Start
 
@@ -34,8 +26,8 @@ Nodeflow/
 ```go
 git clone https://github.com/bashnotscript/nodeflow.git
 cd nodeflow
-go build ./cmd/server
-go build ./cmd/agent
+go build ./cli/server
+go build ./cli/agent
 ```
 
 - Start the Server
@@ -45,7 +37,7 @@ go build ./cmd/agent
 ./server \
 --iface wg0 \
 --port 51820 \
---cidr 10.10.0.0/24 \
+--address 10.10.0.0/24 \
 --token my-secure-token
 # This sets up the WireGuard interface, assigns the first IP, and starts the listener for peer joins.
 ```
