@@ -1,54 +1,53 @@
-// internal/wgnet/find_next_ip.go
 package wgnet
 
 import (
-    "bufio"
     "fmt"
+    "math/rand"
     "net"
-    "os"
-    "strings"
-    "nodeflow/vpn/config"
+    "time"
+
+    "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-func FindNextIP(cfg config.Config) (net.IPNet, error) {
-    confPath := fmt.Sprintf("/etc/wireguard/%s.conf", cfg.Interface)
-    f, err := os.Open(confPath)
-    if err != nil {
-        return net.IPNet{}, fmt.Errorf("failed to open config: %w", err)
-    }
-    defer f.Close()
-
+func FindNextIP(vpnCIDR *net.IPNet, currentPeers []wgtypes.Peer) (net.IP, error) {
     usedIPs := make(map[string]bool)
-    scanner := bufio.NewScanner(f)
-    for scanner.Scan() {
-        line := strings.TrimSpace(scanner.Text())
-        if strings.HasPrefix(line, "AllowedIPs") {
-            parts := strings.SplitN(line, "=", 2)
-            if len(parts) == 2 {
-                ip := strings.TrimSpace(parts[1])
-                usedIPs[ip] = true
-            }
+    usedIPs[vpnCIDR.IP.String()] = true // exclude network address
+
+    for _, peer := range currentPeers {
+        for _, allowed := range peer.AllowedIPs {
+            usedIPs[allowed.IP.String()] = true
         }
     }
 
-    // Scan the subnet to find next available
-    ip := cfg.Subnet.IP.Mask(cfg.Subnet.Mask)
-    for i := 2; i < 255; i++ {
-        candidate := net.IPv4(ip[0], ip[1], ip[2], byte(i))
-        cidr := fmt.Sprintf("%s/%d", candidate.String(), maskSize(cfg.Subnet.Mask))
-        if !usedIPs[cidr] {
-            return net.IPNet{
-                IP:   candidate,
-                Mask: cfg.Subnet.Mask,
-            }, nil
+    // convert subnet mask to prefix length
+    prefixLen, _ := vpnCIDR.Mask.Size()
+    networkBase := vpnCIDR.IP.Mask(vpnCIDR.Mask).To4()
+
+    // Iterate IPs within subnet, skipping network and broadcast addresses
+    start := ipToInt(networkBase) + 1
+    end := start | ((1 << (32 - prefixLen)) - 2) // last usable IP
+
+	  r := rand.New(rand.NewSource(time.Now().UnixNano()))
+    tries := 100
+
+    for range tries {
+        candidateInt := start + uint32(rand.Intn(r.Intn(int(end-start)+1)))
+        candidateIP := intToIP(candidateInt)
+
+        if !usedIPs[candidateIP.String()] && vpnCIDR.Contains(candidateIP) {
+            return candidateIP, nil
         }
     }
 
-    return net.IPNet{}, fmt.Errorf("no available IPs in subnet")
+    return nil, fmt.Errorf("no available IP found after %d tries", tries)
 }
 
-func maskSize(mask net.IPMask) int {
-    ones, _ := mask.Size()
-    return ones
+func ipToInt(ip net.IP) uint32 {
+    ip = ip.To4()
+    return uint32(ip[0])<<24 + uint32(ip[1])<<16 + uint32(ip[2])<<8 + uint32(ip[3])
+}
+
+func intToIP(i uint32) net.IP {
+    return net.IPv4(byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 }
 

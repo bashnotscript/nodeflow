@@ -1,75 +1,81 @@
+// cmd/server.go
 package main
 
 import (
-    "flag"
-    "log"
-    "net"
-    "net/http"
-    "os"
-    "strings"
+	"flag"
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"syscall"
 
-    "nodeflow/vpn/config"
-    "nodeflow/vpn/server"
-    "nodeflow/vpn/wgnet"
+	"nodeflow/vpn/config"
+	"nodeflow/vpn/server"
+	"nodeflow/vpn/wgnet"
 )
 
 func main() {
-    iface := flag.String("iface", "wg0", "WireGuard interface name")
-    cidrStr := flag.String("cidr", "10.0.0.1/24", "VPN CIDR")
-    listenPort := flag.Int("port", 51820, "WireGuard listen port")
-    apiAddr := flag.String("api", ":8080", "API listen address")
-    token := flag.String("token", "", "API join token (required)")
-    flag.Parse()
+	iface := flag.String("iface", "wg0", "WireGuard interface name")
+	apiPort := flag.Int("api-port", 51820, "API server port")
+	token := flag.String("token", "", "API authentication token")
+	daemon := flag.Bool("daemon", false, "Run server in background (daemon mode)")
+	flag.Parse()
 
-    if *token == "" {
-        log.Fatal("API token is required via -token")
-    }
+	if *token == "" {
+		log.Fatal("Error: --token is required")
+	}
 
-    // Parse VPN CIDR
-    _, vpnCIDR, err := net.ParseCIDR(*cidrStr)
-    if err != nil {
-        log.Fatalf("Invalid CIDR %s: %v", *cidrStr, err)
-    }
+	// Daemon mode: fork and run in background
+	if *daemon {
+		cmd := exec.Command(os.Args[0], append(os.Args[1:], "--daemon=false")...)
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		cmd.Stdin = nil
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
-    confPath := "/etc/wireguard/" + *iface + ".conf"
-    var cfg config.Config
+		if err := cmd.Start(); err != nil {
+			log.Fatalf("Failed to start daemon: %v", err)
+		}
+		fmt.Printf("Server running in background with PID %d\n", cmd.Process.Pid)
+		os.Exit(0)
+	}
 
-    // If config exists, load it — otherwise create it
-    if _, err := os.Stat(confPath); err == nil {
-        cfg, err = config.LoadFromFile(confPath)
-        if err != nil {
-            log.Fatalf("Failed to load config: %v", err)
-        }
-        log.Printf("Loaded existing config from %s", confPath)
-    } else {
-        // Discover or create interface
-        pubKey, err := wgnet.DiscoverOrCreateInterface(*iface, vpnCIDR, *listenPort)
-        if err != nil {
-            log.Fatalf("Failed to create or find interface: %v", err)
-        }
+	// Load config from <iface>.conf
+	cfg, err := config.LoadFromFile(*iface)
+	if err != nil {
+		log.Printf("No existing config for %s, creating interface...", *iface)
+		_, ipNet, err := net.ParseCIDR("10.0.0.1/24")
+		if err != nil {
+			log.Fatalf("Failed to parse default CIDR: %v", err)
+		}
+		pubKey, err := wgnet.DiscoverOrCreateInterface(*iface, ipNet, *apiPort)
+		if err != nil {
+			log.Fatalf("Failed to create interface: %v", err)
+		}
+		cfg = &config.Config{
+			IfaceName: *iface,
+			ListenPort: *apiPort,
+			VPNCIDR: ipNet,
+			Token: *token,
+			PublicKey: pubKey,
+		}
+	} else {
+		log.Printf("Loaded existing config for %s", *iface)
+		cfg.IfaceName = *iface
+		cfg.ListenPort = *apiPort
+		cfg.Token = *token
+	}
 
-        // Store initial config
-        cfg = config.Config{
-            InterfaceName: *iface,
-            VPNCIDR:       vpnCIDR,
-            ListenPort:    *listenPort,
-            Token:         *token,
-            PrivateKey:    "", // Already in .conf, no need to store in struct for security
-            Peers:         []config.PeerConfig{},
-        }
+	// Start HTTP API
+	mux := http.NewServeMux()
+	mux.Handle("/join", server.JoinHandler(*cfg))
 
-        log.Printf("Interface %s ready. Public key: %s", *iface, pubKey.String())
-    }
-
-    // Ensure token matches the one from CLI if loaded from file
-    if strings.TrimSpace(cfg.Token) == "" {
-        cfg.Token = *token
-    }
-
-    // HTTP handler for join
-    http.Handle("/join", server.JoinHandler(cfg))
-
-    log.Printf("API listening on %s", *apiAddr)
-    log.Fatal(http.ListenAndServe(*apiAddr, nil))
+	addr := fmt.Sprintf(":%d", *apiPort)
+	log.Printf("API server listening on %s", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Fatalf("API server error: %v", err)
+	}
 }
 

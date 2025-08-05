@@ -4,7 +4,6 @@ import (
     "fmt"
     "net"
     "os"
-    "strings"
 
     "nodeflow/vpn/config"
     "golang.zx2c4.com/wireguard/wgctrl"
@@ -41,7 +40,7 @@ func AddPeer(cfg config.Config, peer config.PeerConfig) error {
         ReplaceAllowedIPs: true,
     }
 
-    if err := client.ConfigureDevice(cfg.Interface, wgtypes.Config{
+    if err := client.ConfigureDevice(cfg.IfaceName, wgtypes.Config{
         Peers: []wgtypes.PeerConfig{wgPeer},
     }); err != nil {
         return fmt.Errorf("failed to configure device: %w", err)
@@ -54,7 +53,7 @@ func AddPeer(cfg config.Config, peer config.PeerConfig) error {
         allowedNet.String(),
     )
 
-    confPath := fmt.Sprintf("/etc/wireguard/%s.conf", cfg.Interface)
+    confPath := fmt.Sprintf("/etc/wireguard/%s.conf", cfg.IfaceName)
     f, err := os.OpenFile(confPath, os.O_APPEND|os.O_WRONLY, 0600)
     if err != nil {
         return fmt.Errorf("failed to open config file for append: %w", err)

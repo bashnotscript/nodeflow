@@ -3,6 +3,7 @@ package server
 import (
     "encoding/json"
     "net/http"
+	   "net"
 
     "golang.zx2c4.com/wireguard/wgctrl"
     "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -38,16 +39,34 @@ func JoinHandler(cfg config.Config) http.HandlerFunc {
             http.Error(w, "Invalid public key", http.StatusBadRequest)
             return
         }
+		
+		            // Get current peers
+        wgClient, err := wgctrl.New()
+        if err != nil {
+            http.Error(w, "Failed to open wgctrl", http.StatusInternalServerError)
+            return
+        }
+        defer wgClient.Close()
 
-        nextIP, err := FindNextIP(cfg.VPNCIDR, device.Peers)
+        device, err := wgClient.Device(cfg.IfaceName)
+        if err != nil {
+            http.Error(w, "Failed to get WG device", http.StatusInternalServerError)
+            return
+        }
+        nextIP, err := wgnet.FindNextIP(cfg.VPNCIDR, device.Peers)	
         if err != nil {
             http.Error(w, "IP allocation failed", http.StatusInternalServerError)
             return
         }
+        peerIPNet := net.IPNet{
+            IP:   nextIP,
+            Mask: net.CIDRMask(32, 32),
+        }
+
 
         peer := config.PeerConfig{
             PublicKey: pubKey,
-            AllowedIP: nextIP,
+            AllowedIP: peerIPNet.String(),
         }
 
         if err := wgnet.AddPeer(cfg, peer); err != nil {
@@ -57,7 +76,7 @@ func JoinHandler(cfg config.Config) http.HandlerFunc {
 
         w.Header().Set("Content-Type", "application/json")
         json.NewEncoder(w).Encode(map[string]string{
-            "ip": nextIP.IP.String(),
+            "ip": nextIP.String(),
         })
     }
 }
