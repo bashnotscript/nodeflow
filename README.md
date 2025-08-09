@@ -68,12 +68,11 @@ WireGuard tools (kernel module must be present)
 
 ## Roadmap
 
+- [ ]  Expiring tokens and join rate-limiting. Generally improve security (Highest Priority)
 - [ ]  NAT traversal for seamless peer-to-peer communication
 - [ ]  Peer list sync across trusted servers
 - [ ]  Optional REST admin UI
-- [ ]  Expiring tokens and join rate-limiting
 - [ ]  Go routines to better handle multiple interfaces at once with different namespaces
-- [ ]  Daemonise the package
 
 ## Contributing
 
