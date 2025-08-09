@@ -48,9 +48,9 @@ go build ./cli/agent
 
 ```go
 ./agent \
---server [http://your-server-ip:8080](http://your-server-ip:8080/) \
+--server [http://your-server-ip:8080](http://your-server-ip:<port>/join) \
 --token my-secure-token \
---iface wg0
+--iface <interface>
 # This fetches configuration from the server and creates a local WireGuard interface accordingly.
 ```
 
