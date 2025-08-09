@@ -11,13 +11,15 @@ Nodeflow is a self-hosted peer-to-peer VPN coordination tool built on WireGuard,
 - Modular design: server and agent with shared networking logic
 
 ## Server Prerequisites
-Linux OS (Ubuntu, Debian, CentOS, or similar) — The server is expected to run on a Linux system with root privileges.
-WireGuard kernel module installed and loaded
-Go runtime (if building from source) — version 1.18 or newer
-Root privileges to create network interfaces and assign IPs.
-Chmod 0600 permissions to the /etc/wireguard folder
-Ensure port 51820/UDP (or your configured port) is open in your firewall.
-The server will create and manage a WireGuard interface (default wg0).
+
+- Linux OS (Ubuntu, Debian, CentOS, or similar)
+- The server is expected to run on a Linux system with root privileges.
+- WireGuard kernel module installed and loaded
+- Go runtime (if building from source) version 1.18 or newer
+- Root privileges to create network interfaces and assign IPs.
+- Chmod 0600 permissions to the /etc/wireguard folder
+- Ensure port 51820/UDP (or your configured port) is open in your firewall.
+- The server will create and manage a WireGuard interface (default wg0).
 
 ## Quick Start
 
@@ -70,7 +72,8 @@ WireGuard tools (kernel module must be present)
 - [ ]  Peer list sync across trusted servers
 - [ ]  Optional REST admin UI
 - [ ]  Expiring tokens and join rate-limiting
-- [ ]  Secure VNC/RDP access between nodes
+- [ ]  Go routines to better handle multiple interfaces at once with different namespaces
+- [ ]  Daemonise the package
 
 ## Contributing
 
